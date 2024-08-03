@@ -65,26 +65,31 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 
-  // 设置 IPC 监听器
-  ipcMain.handle('call-main-method', async (event, { url }) => {
-    console.log(event, url, 'index.ts::93行')
-    const result = await sendHttpsRequest(url)
-    // console.log(result.data, 'index.ts::72行')
-    return result.data
+  // https请求接口
+  ipcMain.handle('https-request', async (_, config) => {
+    console.log(config, 'index.ts::70行')
+    try {
+      config = JSON.parse(config)
+    } catch (error) {
+      console.log(error, 'index.ts::73行')
+    }
+    const response = await axios({
+      ...config,
+      httpsAgent: agent
+    })
+    return JSON.stringify(response.data)
+    // const { url, method, data } = config
+    // const res = await makeRequest()
+    // const response = await axios.get(url, { httpsAgent: agent })
+    // return response
+    // const result = await sendHttpsRequest(url)
+    // // console.log(result.data, 'index.ts::72行')
+    // return result.data
   })
-
-  setTimeout(() => {
-    sendHttpsRequest('https://localhost:8080')
-  }, 3000)
+  // setTimeout(() => {
+  //   sendHttpsRequest('https://localhost:8080')
+  // }, 3000)
 })
-
-async function sendHttpsRequest(url) {
-  console.log(url, 'index.ts::82行')
-  const response = await axios.get(url, { httpsAgent: agent })
-  // console.log(response, 'index.ts::261行')
-  // console.log(response.data, 'index.ts::261行')
-  return response
-}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

@@ -6,7 +6,10 @@
 async function sendHttpsRequest() {
   try {
     // @ts-ignore (define in dts)
-    const data = await window.api.get('https://localhost:8080')
+    const data = await window.api.request({
+      method: 'GET',
+      url: 'https://localhost:8080'
+    })
     // const data = await window.api.get('https://localhost:8080')
     console.log(data, 'App.vue::9行')
   } catch (error) {
@@ -24,59 +27,35 @@ async function sendVideoRequest() {
   }
 }
 
-// 播放视频
-async function playVideo() {
+// 使用https获取播放地址，播放视频
+async function playVideo(videoFlag) {
   const videoElement = document.getElementById('video-player') as HTMLVideoElement
-  const mediaSource = new MediaSource()
-  videoElement.src = URL.createObjectURL(mediaSource)
-
-  mediaSource.addEventListener('sourceopen', async () => {
-    // const sourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="avc1.64001E, mp4a.40.2"')
-
-    // const options = {
-    //   hostname: 'localhost',
-    //   port: 8080,
-    //   path: '/video',
-    //   method: 'GET',
-    //   key: fs.readFileSync('path/to/client-key.pem'),
-    //   cert: fs.readFileSync('path/to/client-cert.pem'),
-    //   ca: fs.readFileSync('path/to/ca-cert.pem'),
-    //   rejectUnauthorized: false, // 如果使用自签名证书
-    //   headers: {
-    //     Range: 'bytes=0-'
-    //   }
-    // }
-
-    // const req = https.request(options, (res) => {
-    //   if (res.statusCode !== 206) {
-    //     console.error(`Request failed with status code: ${res.statusCode}`)
-    //     return
-    //   }
-
-    //   res.on('data', (chunk) => {
-    //     sourceBuffer.appendBuffer(new Uint8Array(chunk))
-    //   })
-
-    //   res.on('end', () => {
-    //     mediaSource.endOfStream()
-    //     videoElement.play()
-    //   })
-    // })
-
-    // req.on('error', (e) => {
-    //   console.error(`Problem with request: ${e.message}`)
-    // })
-
-    // req.end()
+  // @ts-ignore (define in dts)
+  const res = await window.api.request({
+    url: 'https://localhost:8080/video-url',
+    method: 'POST',
+    data: { mediaUrl: `output_${videoFlag}.mp4` },
+    headers: {
+      'Content-Type': 'application/json'
+    }
   })
+  console.log(res.data.videoKey, 'App.vue::32行')
+  videoElement.src = `http://localhost:8081/video?videoKey=${res.data.videoKey}`
+  videoElement.oncanplay = () => {
+    videoElement.play()
+  }
 }
 </script>
 
 <template>
-  <button @click="sendHttpsRequest">发起https请求</button>
-  <!-- <button @click="sendVideoRequest">发起视频请求</button> -->
-  <!-- <button @click="playVideo">播放视频</button> -->
-  <video id="video-player" class="video" src="http://localhost:8081/video" controls></video>
+  <video id="video-player" class="video" controls></video>
+  <div>
+    <button @click="sendHttpsRequest">发起https请求</button>
+    <!-- <button @click="sendVideoRequest">发起视频请求</button> -->
+    <button @click="playVideo('009')">播放视频</button>
+    <button @click="playVideo('011')">播放视频2</button>
+    <!-- <video id="video-player" class="video" src="http://localhost:8081/video" controls></video> -->
+  </div>
 </template>
 <style lang="scss" scoped>
 .video {

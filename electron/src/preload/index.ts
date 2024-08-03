@@ -20,21 +20,30 @@ const agent = new https.Agent({
 // console.log(agent,"index.ts::20行");
 
 const api = {
-  get: async (url) => {
-    // console.log(url, 'index.ts::24行')
-    const response = await ipcRenderer.invoke('call-main-method', { url })
-    // console.log(response)
+  request: async (config) => {
+    let response = await ipcRenderer.invoke('https-request', JSON.stringify(config))
+    try {
+      response = JSON.parse(response)
+    } catch (error) {
+      console.log(error, 'index.ts::28行')
+    }
     return response
-    // try {
-    //   // console.log(agent, 'index.ts::28行')
-    //   // const response = await axios.get(url, { httpsAgent: agent })
-    //   const response = await axios.get(url)
-    //   return response.data
-    // } catch (error) {
-    //   console.error('HTTPS request failed', error)
-    //   throw error
-    // }
   },
+  // get: async (url) => {
+  //   // console.log(url, 'index.ts::24行')
+  //   const response = await ipcRenderer.invoke('call-main-method', { url })
+  //   // console.log(response)
+  //   return response
+  //   // try {
+  //   //   // console.log(agent, 'index.ts::28行')
+  //   //   // const response = await axios.get(url, { httpsAgent: agent })
+  //   //   const response = await axios.get(url)
+  //   //   return response.data
+  //   // } catch (error) {
+  //   //   console.error('HTTPS request failed', error)
+  //   //   throw error
+  //   // }
+  // },
   https: async (url) => {
     const response = await axios.get(url, { httpsAgent: agent })
     return response
