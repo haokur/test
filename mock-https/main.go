@@ -16,6 +16,28 @@ import (
 	"time"
 )
 
+// 中间件处理CORS
+func enableCORS(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 设置允许的域名，这里设置为"*"，表示允许所有域名
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		// 设置允许的HTTP方法
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+
+		// 设置允许的请求头
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization,X-Custom-Token,X-Custom-Other-Param")
+
+		// 如果是预检请求，直接返回
+		if r.Method == "OPTIONS" {
+			return
+		}
+
+		// 调用下一个处理器
+		handler.ServeHTTP(w, r)
+	})
+}
+
 // 定义一个通用的响应结构体
 type Response struct {
 	Status  int         `json:"status"`
@@ -186,8 +208,10 @@ func serveVideo(w http.ResponseWriter, r *http.Request, videoUrl string) {
 
 // http方法-8081
 func httpHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/video" {
-		queryParams := r.URL.Query()
+	// video-with-auth
+	queryParams := r.URL.Query()
+	switch r.URL.Path {
+	case "/video":
 		videoKey := queryParams.Get("videoKey")
 		if videoKey == "" {
 			w.Write([]byte("找不到视频"))
@@ -199,18 +223,27 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.Write([]byte("找不到视频2"))
 		}
-	} else {
+	case "/video-with-auth":
+		videoKey := queryParams.Get("videoKey")
+		serveVideo(w, r, videoKey)
+	default:
 		fmt.Println(r)
 		w.Write([]byte("Hello, HTTPS!"))
 	}
+	// if r.URL.Path == "/video" {
+	// } else {
+	// 	fmt.Println(r)
+	// 	w.Write([]byte("Hello, HTTPS!"))
+	// }
 }
 
 func startHTTPServer(wg *sync.WaitGroup) {
 	defer wg.Done()
 	mux1 := http.NewServeMux()
 	mux1.HandleFunc("/", httpHandler)
+	corsHandler := enableCORS(mux1)
 	fmt.Println("Starting HTTP server on port 8081")
-	if err := http.ListenAndServe(":8081", mux1); err != nil {
+	if err := http.ListenAndServe(":8081", corsHandler); err != nil {
 		fmt.Println("Error starting HTTP server on port 8081:", err)
 	}
 }

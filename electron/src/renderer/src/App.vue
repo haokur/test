@@ -45,6 +45,55 @@ async function playVideo(videoFlag) {
     videoElement.play()
   }
 }
+
+// 使用token和AES加密，鉴权播放
+async function playVideoByAuth(videoFlag) {
+  const videoPlayer = document.getElementById('video-player') as HTMLVideoElement
+  const token = 'yourToken'
+  const otherParam = 'value'
+  const videoUrl = `http://localhost:8081/video-with-auth?videoKey=output_${videoFlag}.mp4`
+  fetch(videoUrl, {
+    method: 'GET',
+    headers: {
+      'X-Custom-Token': token,
+      'X-Custom-Other-Param': otherParam
+    }
+  })
+    .then((response) => {
+      if (response.ok) {
+        return response.blob()
+      }
+      throw new Error('Network response was not ok.')
+    })
+    .then((blob) => {
+      const videoURL = URL.createObjectURL(blob)
+      videoPlayer.src = videoURL
+    })
+    .catch((error) => console.error('There was a problem with the fetch operation:', error))
+
+  // Optionally, handle subsequent range requests for full playback
+  videoPlayer.addEventListener('seeking', () => {
+    const range = `bytes=${videoPlayer.currentTime}-`
+    fetch(`${videoUrl}?range=${range}`, {
+      method: 'GET',
+      headers: {
+        'X-Custom-Token': token,
+        'X-Custom-Other-Param': otherParam,
+        Range: range
+      }
+    })
+      .then((response) => response.blob())
+      .then((blob) => {
+        const videoURL = URL.createObjectURL(blob)
+        videoPlayer.src = videoURL
+      })
+      .catch((error) => console.error('There was a problem with the fetch operation:', error))
+  })
+
+  videoPlayer.oncanplay = () => {
+    videoPlayer.play()
+  }
+}
 </script>
 
 <template>
@@ -52,8 +101,10 @@ async function playVideo(videoFlag) {
   <div>
     <button @click="sendHttpsRequest">发起https请求</button>
     <!-- <button @click="sendVideoRequest">发起视频请求</button> -->
-    <button @click="playVideo('009')">播放视频</button>
-    <button @click="playVideo('011')">播放视频2</button>
+    <button @click="playVideo('009')">播放临时地址播放视频</button>
+    <button @click="playVideo('011')">播放临时地址播放视频2</button>
+
+    <button @click="playVideoByAuth('009')">自定义fetch带参数播放视频</button>
     <!-- <video id="video-player" class="video" src="http://localhost:8081/video" controls></video> -->
   </div>
 </template>
