@@ -7,6 +7,7 @@ import https from 'https'
 import fs from 'fs'
 import path from 'path'
 import axios from 'axios'
+import { CommonUtil } from './utils/common.util'
 
 const caCert = fs.readFileSync(path.join(process.cwd(), '../ssl/ca.crt'))
 const clientCert = fs.readFileSync(path.join(process.cwd(), '../ssl/client.crt'))
@@ -18,6 +19,9 @@ const agent = new https.Agent({
   key: clientKey,
   rejectUnauthorized: true
 })
+
+const userId = '89757'
+let AESKey = ''
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -50,6 +54,25 @@ function createWindow(): void {
   }
 }
 
+async function setAESKey() {
+  AESKey = `${CommonUtil.generateRandomNumberString(32)}`
+  const result = await axios({
+    url: 'https://localhost:8080/cert',
+    method: 'POST',
+    data: {
+      key: userId + '_' + AESKey
+    },
+    headers: {
+      uid: userId,
+      'Content-Type': 'application/json'
+    },
+    httpsAgent: agent
+  })
+  if (!result.data) {
+    AESKey = ''
+  }
+}
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.electron')
 
@@ -78,17 +101,13 @@ app.whenReady().then(() => {
       httpsAgent: agent
     })
     return JSON.stringify(response.data)
-    // const { url, method, data } = config
-    // const res = await makeRequest()
-    // const response = await axios.get(url, { httpsAgent: agent })
-    // return response
-    // const result = await sendHttpsRequest(url)
-    // // console.log(result.data, 'index.ts::72行')
-    // return result.data
   })
-  // setTimeout(() => {
-  //   sendHttpsRequest('https://localhost:8080')
-  // }, 3000)
+
+  ipcMain.handle('get-aes-key', async () => {
+    return AESKey
+  })
+
+  setAESKey()
 })
 
 app.on('window-all-closed', () => {

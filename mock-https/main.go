@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -16,6 +19,71 @@ import (
 	"time"
 )
 
+// AES-256-CBC 解密
+func decryptAES256CBC(encryptedText, key, iv string) (string, error) {
+	// 将加密后的文本从十六进制字符串转换为字节数组
+	cipherText, err := hex.DecodeString(encryptedText)
+	if err != nil {
+		return "", err
+	}
+
+	// 创建 AES 块
+	block, err := aes.NewCipher([]byte(key))
+	if err != nil {
+		return "", err
+	}
+
+	// 确保 IV 长度正确
+	if len(iv) != aes.BlockSize {
+		return "", fmt.Errorf("IV length must be %d bytes", aes.BlockSize)
+	}
+
+	// 创建 CBC 模式解密器
+	mode := cipher.NewCBCDecrypter(block, []byte(iv))
+
+	// 解密
+	plainText := make([]byte, len(cipherText))
+	mode.CryptBlocks(plainText, cipherText)
+
+	// 去除 PKCS#7 填充
+	padding := int(plainText[len(plainText)-1])
+	plainText = plainText[:len(plainText)-padding]
+
+	return string(plainText), nil
+}
+
+// AES-256-CBC 加密
+func encryptAES256CBC(plainText, key, iv string) (string, error) {
+	// 创建 AES 块
+	block, err := aes.NewCipher([]byte(key))
+	if err != nil {
+		return "", err
+	}
+
+	// 确保 IV 长度正确
+	if len(iv) != aes.BlockSize {
+		return "", fmt.Errorf("IV length must be %d bytes", aes.BlockSize)
+	}
+
+	// 使用 PKCS#7 填充
+	padding := aes.BlockSize - len(plainText)%aes.BlockSize
+	padText := make([]byte, padding)
+	for i := 0; i < padding; i++ {
+		padText[i] = byte(padding)
+	}
+	plainTextWithPadding := append([]byte(plainText), padText...)
+
+	// 创建 CBC 模式加密器
+	mode := cipher.NewCBCEncrypter(block, []byte(iv))
+
+	// 加密
+	cipherText := make([]byte, len(plainTextWithPadding))
+	mode.CryptBlocks(cipherText, plainTextWithPadding)
+
+	// 返回加密后的十六进制字符串
+	return hex.EncodeToString(cipherText), nil
+}
+
 // 中间件处理CORS
 func enableCORS(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +94,7 @@ func enableCORS(handler http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 
 		// 设置允许的请求头
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization,X-Custom-Token,X-Custom-Other-Param")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization,X-Custom-Token,X-Custom-Other-Param,uid")
 
 		// 如果是预检请求，直接返回
 		if r.Method == "OPTIONS" {
@@ -210,7 +278,47 @@ func serveVideo(w http.ResponseWriter, r *http.Request, videoUrl string) {
 func httpHandler(w http.ResponseWriter, r *http.Request) {
 	// video-with-auth
 	queryParams := r.URL.Query()
+
+	// 读取并打印请求体
+	var jsonData map[string]interface{}
+	if r.Body != nil {
+		defer r.Body.Close()
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Unable to read body", http.StatusInternalServerError)
+			return
+		}
+		fmt.Println("Body:")
+		fmt.Println(string(body))
+
+		// 如果请求体是JSON格式，可以尝试解析它
+		if err := json.Unmarshal(body, &jsonData); err == nil {
+			fmt.Println("JSON Data:")
+			for key, value := range jsonData {
+				fmt.Printf("  %s: %v\n", key, value)
+			}
+		}
+	}
+
 	switch r.URL.Path {
+	case "/check-sign":
+		userId := r.Header.Get("Uid")
+		fmt.Println("请求的数据::", userId, jsonData)
+		userAESKey, found := cache.Get(userId)
+		AESIv := "5505035036622383"
+		if found {
+			fmt.Println(userAESKey)
+			decryptedText, err := decryptAES256CBC(jsonData["data"].(string), userAESKey.(string), AESIv)
+			if err != nil {
+				fmt.Println("Error decrypting:", err)
+				return
+			}
+			fmt.Println(decryptedText)
+			response, _ := encryptAES256CBC("{\"name\":\"haokur from response\"}", userAESKey.(string), AESIv)
+			jsonResponse(w, http.StatusOK, "Request successful", response)
+		}
+		// w.Write([]byte("响应到这了"))
+		break
 	case "/video":
 		videoKey := queryParams.Get("videoKey")
 		if videoKey == "" {
@@ -223,18 +331,15 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.Write([]byte("找不到视频2"))
 		}
+		break
 	case "/video-with-auth":
 		videoKey := queryParams.Get("videoKey")
 		serveVideo(w, r, videoKey)
+		break
 	default:
 		fmt.Println(r)
 		w.Write([]byte("Hello, HTTPS!"))
 	}
-	// if r.URL.Path == "/video" {
-	// } else {
-	// 	fmt.Println(r)
-	// 	w.Write([]byte("Hello, HTTPS!"))
-	// }
 }
 
 func startHTTPServer(wg *sync.WaitGroup) {
@@ -297,7 +402,12 @@ func TLSHandler(w http.ResponseWriter, r *http.Request) {
 	// 根据请求路径处理请求
 	switch r.URL.Path {
 	case "/cert":
-		fmt.Fprintln(w, "Handling /cert")
+		if jsonData["key"] != "" {
+			str := jsonData["key"].(string)
+			parts := strings.Split(str, "_")
+			cache.Set(parts[0], parts[1], time.Minute*1600)
+			w.Write([]byte("Success"))
+		}
 	case "/video-url":
 		// 生成随机字符串
 		randomStr := RandomString(36)

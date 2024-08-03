@@ -94,6 +94,20 @@ async function playVideoByAuth(videoFlag) {
     videoPlayer.play()
   }
 }
+
+async function aesCheck() {
+  // @ts-ignore (define in dts)
+  const res = await window.api.aesRequest({
+    url: 'http://localhost:8081/check-sign',
+    method: 'POST',
+    data: { name: 'haokur' },
+    headers: {
+      uid: '89757',
+      'Content-Type': 'application/json'
+    }
+  })
+  console.log(res, 'App.vue::108行')
+}
 </script>
 
 <template>
@@ -105,6 +119,8 @@ async function playVideoByAuth(videoFlag) {
     <button @click="playVideo('011')">播放临时地址播放视频2</button>
 
     <button @click="playVideoByAuth('009')">自定义fetch带参数播放视频</button>
+
+    <button @click="aesCheck">AES加密验证</button>
     <!-- <video id="video-player" class="video" src="http://localhost:8081/video" controls></video> -->
   </div>
 </template>
