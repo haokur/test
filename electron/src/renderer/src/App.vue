@@ -72,23 +72,23 @@ async function playVideoByAuth(videoFlag) {
     .catch((error) => console.error('There was a problem with the fetch operation:', error))
 
   // Optionally, handle subsequent range requests for full playback
-  videoPlayer.addEventListener('seeking', () => {
-    const range = `bytes=${videoPlayer.currentTime}-`
-    fetch(`${videoUrl}?range=${range}`, {
-      method: 'GET',
-      headers: {
-        'X-Custom-Token': token,
-        'X-Custom-Other-Param': otherParam,
-        Range: range
-      }
-    })
-      .then((response) => response.blob())
-      .then((blob) => {
-        const videoURL = URL.createObjectURL(blob)
-        videoPlayer.src = videoURL
-      })
-      .catch((error) => console.error('There was a problem with the fetch operation:', error))
-  })
+  // videoPlayer.addEventListener('seeking', () => {
+  //   const range = `bytes=${videoPlayer.currentTime}-`
+  //   fetch(`${videoUrl}?range=${range}`, {
+  //     method: 'GET',
+  //     headers: {
+  //       'X-Custom-Token': token,
+  //       'X-Custom-Other-Param': otherParam,
+  //       Range: range
+  //     }
+  //   })
+  //     .then((response) => response.blob())
+  //     .then((blob) => {
+  //       const videoURL = URL.createObjectURL(blob)
+  //       videoPlayer.src = videoURL
+  //     })
+  //     .catch((error) => console.error('There was a problem with the fetch operation:', error))
+  // })
 
   videoPlayer.oncanplay = () => {
     videoPlayer.play()
@@ -108,19 +108,90 @@ async function aesCheck() {
   })
   console.log(res, 'App.vue::108行')
 }
+
+async function getSign(data) {
+  // @ts-ignore (define in dts)
+  const encryptStr = await window.api.encrypt({
+    ...data,
+    timeStamp: Date.now() + ''
+  })
+  return encryptStr
+}
+
+async function aesVideoPlay(videoFlag) {
+  const videoPlayer = document.getElementById('video-player') as HTMLVideoElement
+  const videoUrl = `http://localhost:8081/video-with-aes?t=${Date.now()}`
+  const videoName = videoFlag
+  // const videoName = `input.mp4`
+  const sign = await getSign({
+    uid: '89757',
+    videoKey: videoName
+  })
+  fetch(videoUrl, {
+    method: 'GET',
+    headers: { sign, uid: '89757' }
+  })
+    .then((response) => {
+      if (response.ok) {
+        return response.blob()
+      }
+      throw new Error('Network response was not ok.')
+    })
+    .then((blob) => {
+      const videoURL = URL.createObjectURL(blob)
+      videoPlayer.src = videoURL
+    })
+    .catch((error) => console.error('There was a problem with the fetch operation:', error))
+
+  // 不需要手动控制，video标签已处理
+  // videoPlayer.addEventListener('seeking', async () => {
+  //   const sign = await getSign({
+  //     uid: '89757',
+  //     videoKey: videoName
+  //   })
+  //   // const range = `bytes=${videoPlayer.currentTime}-`
+  //   fetch(`${videoUrl}?t=${Date.now()}`, {
+  //     method: 'GET',
+  //     headers: {
+  //       sign,
+  //       uid: '89757'
+  //       // Range: range
+  //     }
+  //   })
+  //     .then((response) => response.blob())
+  //     .then((blob) => {
+  //       const videoURL = URL.createObjectURL(blob)
+  //       videoPlayer.src = videoURL
+  //     })
+  //     .catch((error) => console.error('There was a problem with the fetch operation:', error))
+  // })
+
+  videoPlayer.oncanplay = () => {
+    videoPlayer.play()
+  }
+}
 </script>
 
 <template>
   <video id="video-player" class="video" controls></video>
   <div>
-    <button @click="sendHttpsRequest">发起https请求</button>
+    <div>
+      <button @click="sendHttpsRequest">主进程发起https请求</button>
+    </div>
     <!-- <button @click="sendVideoRequest">发起视频请求</button> -->
-    <button @click="playVideo('009')">播放临时地址播放视频</button>
-    <button @click="playVideo('011')">播放临时地址播放视频2</button>
+    <div>
+      <button @click="playVideo('009')">主进程https获取临时播放地址播放</button>
+      <button @click="playVideo('011')">主进程https获取临时播放地址播放2</button>
+    </div>
 
-    <button @click="playVideoByAuth('009')">自定义fetch带参数播放视频</button>
+    <!-- <button @click="playVideoByAuth('009')">自定义fetch带参数播放视频</button>
+    <button @click="aesCheck">AES加密验证请求测试</button> -->
+    <div>
+      <button @click="aesVideoPlay('output_009.mp4')">AES加密验证视频请求</button>
+      <button @click="aesVideoPlay('output_011.mp4')">AES加密验证视频请求2</button>
+      <!-- <button @click="aesVideoPlay('input.mp4')">AES加密验证视频请求</button> -->
+    </div>
 
-    <button @click="aesCheck">AES加密验证</button>
     <!-- <video id="video-player" class="video" src="http://localhost:8081/video" controls></video> -->
   </div>
 </template>
@@ -128,5 +199,9 @@ async function aesCheck() {
 .video {
   width: 500px;
   height: 300px;
+}
+button {
+  margin-right: 10px;
+  margin-bottom: 10px;
 }
 </style>

@@ -63,6 +63,20 @@ const api = {
     }
     return response
   },
+  encrypt: async (data) => {
+    const AESIv = '5505035036622383'
+    const AESKey = await ipcRenderer.invoke('get-aes-key')
+    let encryptSource = data
+    if (typeof data === 'object') {
+      encryptSource = JSON.stringify(data)
+    }
+    return encrypt(encryptSource, AESKey, AESIv)
+  },
+  decrypt: async (str) => {
+    const AESIv = '5505035036622383'
+    const AESKey = await ipcRenderer.invoke('get-aes-key')
+    return decrypt(str, AESKey, AESIv)
+  },
   // get: async (url) => {
   //   // console.log(url, 'index.ts::24行')
   //   const response = await ipcRenderer.invoke('call-main-method', { url })

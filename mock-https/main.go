@@ -94,7 +94,7 @@ func enableCORS(handler http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 
 		// 设置允许的请求头
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization,X-Custom-Token,X-Custom-Other-Param,uid")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization,X-Custom-Token,X-Custom-Other-Param,uid,sign,range")
 
 		// 如果是预检请求，直接返回
 		if r.Method == "OPTIONS" {
@@ -335,6 +335,48 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 	case "/video-with-auth":
 		videoKey := queryParams.Get("videoKey")
 		serveVideo(w, r, videoKey)
+		break
+	case "/video-with-aes":
+		userId := r.Header.Get("Uid")
+		sign := r.Header.Get("Sign")
+		fmt.Println("请求的数据::", userId, sign, jsonData)
+		userAESKey, found := cache.Get(userId)
+		AESIv := "5505035036622383"
+		if found {
+			decryptedText, err := decryptAES256CBC(sign, userAESKey.(string), AESIv)
+			if err != nil {
+				fmt.Println("Error decrypting:", err)
+				return
+			}
+			fmt.Println(decryptedText)
+
+			// 如果能AES解密出加密的信息里面的uid，则可以认为请求是合法的，返回视频信息
+			var signData struct {
+				Uid       string `json:"uid"`
+				VideoKey  string `json:"videoKey"`
+				TimeStamp string `json:"timeStamp"`
+			}
+			err2 := json.Unmarshal([]byte(decryptedText), &signData)
+			if err2 != nil {
+				fmt.Println("Error parsing JSON:", err)
+				return
+			}
+			currentTimestamp := time.Now().Unix()
+			reqTimestamp, err := strconv.ParseInt(signData.TimeStamp, 10, 64)
+			if err != nil {
+				http.Error(w, "Invalid timestamp format", http.StatusBadRequest)
+				return
+			}
+			timeDifference := currentTimestamp - reqTimestamp
+			if timeDifference > 60 {
+				http.Error(w, "Timestamp is too old", http.StatusForbidden)
+				return
+			}
+			if signData.Uid != "" && signData.VideoKey != "" {
+				fmt.Println("VideoKey::", signData.VideoKey)
+				serveVideo(w, r, signData.VideoKey)
+			}
+		}
 		break
 	default:
 		fmt.Println(r)
