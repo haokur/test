@@ -3,10 +3,10 @@
 
 // const ipcHandle = () => window.electron.ipcRenderer.send('ping')
 
-async function sendRequest() {
+async function sendHttpsRequest() {
   try {
     // @ts-ignore (define in dts)
-    const data = await window.api.https('https://localhost:8080')
+    const data = await window.api.get('https://localhost:8080')
     // const data = await window.api.get('https://localhost:8080')
     console.log(data, 'App.vue::9行')
   } catch (error) {
@@ -73,7 +73,7 @@ async function playVideo() {
 </script>
 
 <template>
-  <button @click="sendRequest">发起普通请求</button>
+  <button @click="sendHttpsRequest">发起https请求</button>
   <!-- <button @click="sendVideoRequest">发起视频请求</button> -->
   <!-- <button @click="playVideo">播放视频</button> -->
   <video id="video-player" class="video" src="http://localhost:8081/video" controls></video>
