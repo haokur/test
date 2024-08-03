@@ -27,6 +27,8 @@ function createWindow(): void {
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
     }
@@ -63,15 +65,25 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 
+  // 设置 IPC 监听器
+  ipcMain.handle('call-main-method', async (event, { url }) => {
+    console.log(event, url, 'index.ts::93行')
+    const result = await sendHttpsRequest(url)
+    // console.log(result.data, 'index.ts::72行')
+    return result.data
+  })
+
   setTimeout(() => {
-    sendRequest('https://localhost:8080')
+    sendHttpsRequest('https://localhost:8080')
   }, 3000)
 })
 
-async function sendRequest(url) {
+async function sendHttpsRequest(url) {
+  console.log(url, 'index.ts::82行')
   const response = await axios.get(url, { httpsAgent: agent })
-  console.log(response, 'index.ts::261行')
-  console.log(response.data, 'index.ts::261行')
+  // console.log(response, 'index.ts::261行')
+  // console.log(response.data, 'index.ts::261行')
+  return response
 }
 
 app.on('window-all-closed', () => {

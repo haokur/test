@@ -1,10 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
-	"crypto/x509"
-	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -13,56 +9,9 @@ import (
 )
 
 func main() {
-	startTLSServer()
-	startHttpServer()
-}
-
-func startHttpServer() {
-	httpServer := &http.Server{
-		Addr:    ":8081",
-		Handler: http.HandlerFunc(httpHandler),
-	}
-
-	// go func() {
-	fmt.Println("Starting HTTP server on port 8081---")
-	log.Println("Starting HTTP server on port 8081")
-	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("HTTP server ListenAndServe: %v", err)
-	}
-	// }()
-}
-
-func startTLSServer() {
-	certFile := "./ssl/server.crt"
-	keyFile := "./ssl/server.key"
-	caCertFile := "./ssl/ca.crt"
-
-	caCert, err := ioutil.ReadFile(caCertFile)
-	if err != nil {
-		log.Fatalf("Failed to read CA cert file: %v", err)
-	}
-
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
-
-	// 启用详细的 TLS 调试信息
-	os.Setenv("GODEBUG", "tls13=1,tlsdebug=1")
-
-	cfg := &tls.Config{
-		MinVersion: tls.VersionTLS13,
-		ClientAuth: tls.RequireAndVerifyClientCert, // 仅校验ca时，注释这行
-		ClientCAs:  caCertPool,
-	}
-	srv := &http.Server{
-		Addr:      ":8080",
-		Handler:   http.HandlerFunc(TLSHandler),
-		TLSConfig: cfg,
-	}
-
-	log.Printf("Starting server on https://localhost:8080")
-	if err := srv.ListenAndServeTLS(certFile, keyFile); err != nil {
-		log.Fatalf("Server failed: %v", err)
-	}
+	http.HandleFunc("/video", serveVideo)
+	log.Println("Starting server on :8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func serveVideo(w http.ResponseWriter, r *http.Request) {
@@ -147,26 +96,5 @@ func serveVideo(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Write(buf[:n])
 		start += int64(n)
-	}
-}
-
-// http绑定的方法-8081
-func httpHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("http", w, r)
-	if r.URL.Path == "/video" {
-		serveVideo(w, r)
-	} else {
-		fmt.Println(r)
-		w.Write([]byte("Hello, HTTP!"))
-	}
-}
-
-// tls绑定的方法-8080
-func TLSHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/cert" {
-		fmt.Println(w, r)
-	} else {
-		fmt.Println(r)
-		w.Write([]byte("Hello, HTTPS!"))
 	}
 }
