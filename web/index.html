@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Source Example</title>
+    <script src="./media-source-player.js"></script>
+    <style>
+        video {
+            width: 500px;
+        }
+
+        .mb16 {
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="mb16">
+        <video id="video0" controls></video>
+        <div>
+            <button type="button" id="play-static-video">播放静态资源</button>
+        </div>
+    </div>
+    <div class="mb16">
+        <video id="video" controls></video>
+        <div>
+            <button type="button" id="play-koa-video-first-slice">仅加载播放Koa分片第一片资源</button>
+            <button type="button" id="play-koa-video-second-slice">加载播放Koa分片第二片资源</button>
+            <button type="button" id="play-koa-video-third-slice">加载播放Koa分片第三片资源</button>
+        </div>
+    </div>
+    <div class="mb16">
+        <video id="video2" controls></video>
+        <div>
+            <button type="button" id="play-koa-video-all-slice">自动加载播放Koa分片所有分片资源</button>
+            <button type="button" id="play-koa-video-all-plus">继续追加</button>
+            <button type="button" id="play-koa-video-all-close">手动结束视频流</button>
+        </div>
+    </div>
+    <script>
+        const videoFileName = 'frag_bunny.mp4'
+        const koaServe206VideoUrl = `http://localhost:9090/video?videoFileName=${videoFileName}`
+
+        const playStaticBtn = document.querySelector("#play-static-video")
+        playStaticBtn.addEventListener("click", () => {
+            // 有点奇怪，总时长一直在动态变化
+            const video0 = document.getElementById('video0');
+            video0.src = `http://localhost:9090/${videoFileName}`
+        })
+
+        let sliceMediaSourcePlayer = null
+        const playKoaFirstBtn = document.querySelector("#play-koa-video-first-slice")
+        const video = document.getElementById('video');
+        playKoaFirstBtn.addEventListener('click', () => {
+            // 第一片分片加载正确
+            sliceMediaSourcePlayer = new MediaSourcePlayer({
+                videoUrl: koaServe206VideoUrl,
+                onUpdateEnd() {
+                    console.log("分片加载结束", sliceMediaSourcePlayer.chunkIndex, "index.html::50行");
+                }
+            })
+            video.src = sliceMediaSourcePlayer.blobUrl
+            sliceMediaSourcePlayer.run()
+        })
+
+        const playKoaSecondBtn = document.querySelector('#play-koa-video-second-slice')
+        playKoaSecondBtn.addEventListener('click', async () => {
+            if (!sliceMediaSourcePlayer) { return alert("请先加载第一个分片") }
+            // sliceMediaSourcePlayer.insertSourceByChunkIndex(1)
+            sliceMediaSourcePlayer.insertNextSlice()
+        })
+
+        const playKoaThirdBtn = document.querySelector('#play-koa-video-third-slice')
+        playKoaThirdBtn.addEventListener('click', async () => {
+            if (!sliceMediaSourcePlayer) { return alert("请先加载第一个分片") }
+            // sliceMediaSourcePlayer.insertSourceByChunkIndex(3)
+            sliceMediaSourcePlayer.insertNextSlice()
+        })
+
+        /*自动加载全部*/
+        const playKoaVideoAllSlice = document.querySelector("#play-koa-video-all-slice")
+        const video2 = document.getElementById('video2');
+        let mediaSource = null
+        playKoaVideoAllSlice.addEventListener('click', () => {
+            mediaSource = new MediaSourcePlayer({
+                videoUrl: koaServe206VideoUrl,
+                onEnd() {
+                    console.log("自定义监听文件流加载完成", "index.html::80行");
+                }
+            })
+            video2.src = mediaSource.blobUrl
+            mediaSource.run()
+        })
+        // 全部加载完后再追加(为什么不生效？可能是检测到相同的内容数据已经添加过了？)
+        const playKoaVideoAllPlus = document.getElementById('play-koa-video-all-plus')
+        playKoaVideoAllPlus.addEventListener('click', () => {
+            if (!mediaSource) return alert("请先点击加载全部")
+            mediaSource.insertSourceByChunkIndex(0)
+        })
+
+        const playKoaVideoEnd = document.getElementById("play-koa-video-all-close")
+        playKoaVideoAllPlus.addEventListener('click', () => {
+            mediaSource.end()
+        })
+    </script>
+</body>
+
+</html>

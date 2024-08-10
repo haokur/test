@@ -92,9 +92,42 @@ const api = {
   //   //   throw error
   //   // }
   // },
-  https: async (url) => {
-    const response = await axios.get(url, { httpsAgent: agent })
-    return response
+  https: async (options) => {
+    return new Promise((resolve) => {
+      const config = {
+        ...options,
+        ca: fs.readFileSync(path.join(process.cwd(), '../ssl/ca.crt')),
+        key: fs.readFileSync(path.join(process.cwd(), '../ssl/client.key')),
+        cert: fs.readFileSync(path.join(process.cwd(), '../ssl/client.crt'))
+      }
+      const req = https.request(config, (res) => {
+        // let data = ''
+        const chunks: Buffer[] = []
+
+        res.on('data', (chunk) => {
+          // data += chunk
+          chunks.push(chunk)
+        })
+
+        res.on('end', () => {
+          const buffer = Buffer.concat(chunks) // 将所有数据块合并为一个完整的 Buffer
+          resolve({
+            headers: res.headers,
+            data: buffer
+          })
+        })
+      })
+
+      req.on('error', (e) => {
+        console.error(`请求遇到问题: ${e.message}`)
+      })
+
+      req.end()
+    })
+
+    // const response = await axios.get(url, { httpsAgent: agent })
+    // console.log(response)
+    // return response
   }
 }
 

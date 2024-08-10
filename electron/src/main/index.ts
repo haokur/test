@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -74,6 +74,13 @@ async function setAESKey() {
 }
 
 app.whenReady().then(() => {
+  app.commandLine.appendSwitch(
+    'ssl-client-certificate-file',
+    path.join(process.cwd(), '../ssl/client.crt')
+  )
+  app.commandLine.appendSwitch('ssl-key-file', path.join(process.cwd(), '../ssl/client.key'))
+  app.commandLine.appendSwitch('ssl-ca-file', path.join(process.cwd(), '../ssl/ca.crt'))
+
   electronApp.setAppUserModelId('com.electron')
 
   app.on('browser-window-created', (_, window) => {
@@ -108,6 +115,12 @@ app.whenReady().then(() => {
   })
 
   setAESKey()
+
+  // session.defaultSession.setSSLConfig({
+  //   // cert: clientCert,
+  //   // key: clientKey,
+  //   // ca: caCert
+  // })
 })
 
 app.on('window-all-closed', () => {

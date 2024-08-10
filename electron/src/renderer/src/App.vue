@@ -1,7 +1,40 @@
 <script setup lang="ts">
+// import  from './classes/media-source-player.ts'
 // import Versions from './components/Versions.vue'
 
 // const ipcHandle = () => window.electron.ipcRenderer.send('ping')
+import { MediaSourcePlayer } from './classes/media-source-player'
+
+const playMediaSourceVideo = () => {
+  const sliceMediaSourcePlayer = new MediaSourcePlayer({
+    // videoUrl: 'http://localhost:9000/video',
+    // videoUrl: 'https://localhost:9000/video',
+    videoUrl: async (config) => {
+      // @ts-ignore (define in dts)
+      const res = await window.api.https({
+        hostname: 'localhost', // 注意这里，前面不要加https
+        port: 9099, // 默认 HTTPS 端口
+        path: '/video', // 请求路径
+        method: 'GET', // 请求方法
+        // url: 'https://localhost:9000/video',
+        headers: config.headers
+      })
+      return res
+    },
+    async onUpdateEnd() {
+      console.log('自定义单分片加载完毕回调')
+      // 加载下一个分片
+      await sliceMediaSourcePlayer.insertNextSlice()
+    },
+    async onEnd() {
+      console.log('所有分片加载完毕回调')
+      await sliceMediaSourcePlayer.end()
+    }
+  })
+  const video = document.getElementById('video-player') as HTMLVideoElement
+  video.src = sliceMediaSourcePlayer.blobUrl
+  sliceMediaSourcePlayer.run()
+}
 
 async function sendHttpsRequest() {
   try {
@@ -174,6 +207,9 @@ async function aesVideoPlay(videoFlag) {
 
 <template>
   <video id="video-player" class="video" controls></video>
+  <div>
+    <button @click="playMediaSourceVideo">Media Source的方式播放视频</button>
+  </div>
   <div>
     <div>
       <button @click="sendHttpsRequest">主进程发起https请求</button>
