@@ -221,3 +221,23 @@ cd web && http-server
 cd koa-serve && node main.js
 ```
 
+已知的支持的 Media Source 播放的 mp4 的转码格式是 dash ，可以使用 ffmpeg 将普通 mp4 转成 dash
+DASH（Dynamic Adaptive Streaming over HTTP）
+
+```sh
+ffmpeg -i input.mp4 -c:v libx264 -c:a aac -movflags +frag_keyframe+empty_moov+default_base_moof -f mp4 output_dash.mp4
+```
+
+参数说明：
+```
+-i input.mp4: 输入的 MP4 文件。
+-c:v libx264: 使用 H.264 编码器进行视频编码。
+-c:a aac: 使用 AAC 编码器进行音频编码。
+-movflags +frag_keyframe+empty_moov+default_base_moof:
++frag_keyframe: 在关键帧处创建片段，确保每个片段以关键帧开始。
++empty_moov: 在文件开头生成一个空的 moov 块，这对于流媒体播放非常重要。
++default_base_moof: 使用默认的 moof 基准，这有助于确保片段正确排列。
+-f mp4: 指定输出格式为 MP4。
+output_dash.mp4: 输出的 MP4 文件名。
+```
+

@@ -42,6 +42,7 @@
     </div>
     <script>
         const videoFileName = 'frag_bunny.mp4'
+        // const videoFileName = 'output_dash.mp4'
         const koaServe206VideoUrl = `http://localhost:9090/video?videoFileName=${videoFileName}`
 
         const playStaticBtn = document.querySelector("#play-static-video")
@@ -102,7 +103,8 @@
         })
 
         const playKoaVideoEnd = document.getElementById("play-koa-video-all-close")
-        playKoaVideoAllPlus.addEventListener('click', () => {
+        playKoaVideoEnd.addEventListener('click', () => {
+            console.log("关闭视频流，不能再追加", "index.html::107行");
             mediaSource.end()
         })
     </script>
